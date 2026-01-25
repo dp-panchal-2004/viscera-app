@@ -1,13 +1,16 @@
+import { useAppDispatch } from "@/src/hooks/store";
+import { logoutUser } from "@/src/store/authSlice";
+import { toast } from "@/src/utils/toast";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    FlatList,
-    Modal,
-    Pressable,
-    Text,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  Pressable,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -63,7 +66,23 @@ const settingsData = [
 
 const SettingScreen = () => {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const message = await dispatch(logoutUser()).unwrap();
+      setShowLogoutModal(false);
+      toast.success(message || "Logged out successfully");
+      router.replace("/auth/login/login");
+    } catch (err: any) {
+      toast.error(err || "Failed to logout. Please try again.");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <SafeAreaView className='flex-1 bg-gray-white w-full"'>
@@ -108,9 +127,8 @@ const SettingScreen = () => {
                 />
               </View>
               <Text
-                className={`text-body1 font-medium ${
-                  item.textColor || "text-text-primary"
-                }`}
+                className={`text-body1 font-medium ${item.textColor || "text-text-primary"
+                  }`}
               >
                 {item.title}
               </Text>
@@ -158,6 +176,7 @@ const SettingScreen = () => {
             <View className="flex-row gap-3 w-full">
               <Pressable
                 onPress={() => setShowLogoutModal(false)}
+                disabled={isLoggingOut}
                 className="flex-1 py-3 rounded-xl bg-gray-light items-center"
               >
                 <Text className="text-body1 font-medium text-text-primary">
@@ -166,14 +185,12 @@ const SettingScreen = () => {
               </Pressable>
 
               <Pressable
-                onPress={() => {
-                  setShowLogoutModal(false);
-                  router.push("/auth/login/login");
-                }}
-                className="flex-1 py-3 rounded-xl bg-primary-main items-center"
+                onPress={handleLogout}
+                disabled={isLoggingOut}
+                className={`flex-1 py-3 rounded-xl items-center ${isLoggingOut ? "bg-primary-light" : "bg-primary-main"}`}
               >
                 <Text className="text-body1 font-semibold text-white">
-                  Logout
+                  {isLoggingOut ? "Logging out..." : "Logout"}
                 </Text>
               </Pressable>
             </View>

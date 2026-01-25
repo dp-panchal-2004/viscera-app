@@ -17,13 +17,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import BasicInfo from "./BasicInfo";
 import Otp from "./Otp";
-import WorkStatus from "./WorkStatus";
 
 const Register = () => {
   const { isTablet } = useResponsive();
   const router = useRouter();
 
-    const handleBack = () => {
+  const handleBack = () => {
     if (step === 1) {
       router.push("/auth/login/login");
     } else {
@@ -42,12 +41,7 @@ const Register = () => {
 
   const handleNextOtp = (otpValue: string) => {
     setOtp(otpValue);
-    setStep(3);
-  };
-
-  const handleComplete = (status: string) => {
-    // const registrationData = { ...basicInfo, otp, workStatus: status };
-    // console.log("Final Registration Data:", registrationData);
+    // Registration complete, navigate to welcome
     router.push("/auth/welcome/welcome");
   };
 
@@ -60,18 +54,18 @@ const Register = () => {
         {step !== 2 && (
           <View className={`w-full px-6 gap-4 ${isTablet ? "w-[450px]" : "w-full"}`}>
             <View className="w-full py-6 flex-row items-center">
-     
-      <TouchableOpacity
-        onPress={handleBack}
-        className="mr-4"
-      >
-        <Ionicons name="arrow-back" size={24} color="#000" />
-      </TouchableOpacity>
 
-      <Text className="text-h1 font-bold text-text-primary">
-        {step === 1 ? "Create Account" : "Work Status"}
-      </Text>
-    </View>
+              <TouchableOpacity
+                onPress={handleBack}
+                className="mr-4"
+              >
+                <Ionicons name="arrow-back" size={24} color="#000" />
+              </TouchableOpacity>
+
+              <Text className="text-h1 font-bold text-text-primary">
+                Create Account
+              </Text>
+            </View>
 
             <View className="w-full ">
               <View className="w-full flex-row h-2 mb-4 gap-2">
@@ -83,8 +77,8 @@ const Register = () => {
                 />
               </View>
               <Text className="text-h4 font-medium text-text-secondary ">
-                Step {step > 2 ? 2 : step} of 2 -{" "}
-                {step === 1 ? "Basic Information" : "Professional Status"}
+                Step {step} of 2 -{" "}
+                {step === 1 ? "Basic Information" : "Verification"}
               </Text>
             </View>
           </View>
@@ -95,11 +89,19 @@ const Register = () => {
         >
           <View className={`items-center ${isTablet ? "w-[450px]" : "w-full"}`}>
             <View className="pb-10 w-full">
-              {step === 1 && <BasicInfo onNext={handleNextBasicInfo} />}
-              {step === 2 && (
-                <Otp mobile={basicInfo.mobile} onNext={handleNextOtp} />
+              {step === 1 && (
+                <BasicInfo
+                  onNext={handleNextBasicInfo}
+                  defaultValues={basicInfo}
+                />
               )}
-              {step === 3 && <WorkStatus onComplete={handleComplete} />}
+              {step === 2 && (
+                <Otp
+                  mobile={basicInfo.mobile}
+                  email={basicInfo.email}
+                  onNext={handleNextOtp}
+                />
+              )}
             </View>
           </View>
         </ScrollView>

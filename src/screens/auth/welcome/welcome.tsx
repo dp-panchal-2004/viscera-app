@@ -1,9 +1,11 @@
 import ButtonComponent from "@/src/components/ButtonComponent";
+import { useAppDispatch, useAppSelector } from "@/src/hooks/store";
 import { useResponsive } from "@/src/hooks/useResponsive";
+import { fetchCompletionScore } from "@/src/store/nurseSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -11,6 +13,24 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const welcome = () => {
   const { isTablet } = useResponsive();
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { completionScore } = useAppSelector((state) => state.nurse);
+
+  useEffect(() => {
+    dispatch(fetchCompletionScore());
+  }, [dispatch]);
+
+  const totalCompletion = completionScore
+    ? Math.min(
+      100,
+      (completionScore.genralInfoPercentage || 0) +
+      (completionScore.resumePercentage || 0) +
+      (completionScore.documentPercentage || 0) +
+      (completionScore.experiencePercentage || 0) +
+      (completionScore.skillsPercentage || 0) +
+      (completionScore.licensePercentage || 0)
+    )
+    : 0;
   return (
     <SafeAreaView className="flex-1 ">
       <ScrollView
@@ -33,7 +53,7 @@ const welcome = () => {
               <Text className="text-h6 text-text-primary font-semibold">
                 Profile Completion
               </Text>
-              <Text className="text-h2 font-bold text-primary-main">15%</Text>
+              <Text className="text-h2 font-bold text-primary-main">{totalCompletion}%</Text>
             </View>
             <View className="w-full h-3 rounded-full bg-gray-light overflow-hidden">
               <LinearGradient
@@ -41,7 +61,7 @@ const welcome = () => {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={{
-                  width: "15%",
+                  width: `${totalCompletion}%`,
                   height: "100%",
                   borderRadius: 999,
                 }}
@@ -52,15 +72,15 @@ const welcome = () => {
             </Text>
           </View>
           <ButtonComponent
-          title="Complete Profile Now"
-          className="mb-2"
-          onPress={() => router.push('/app/(tabs)/profile')}
-           />
-           <ButtonComponent 
-           title="Skip for Now"
-           variant="outlined"
+            title="Complete Profile Now"
+            className="mb-2"
+            onPress={() => router.push('/app/(tabs)/profile')}
+          />
+          <ButtonComponent
+            title="Skip for Now"
+            variant="outlined"
             onPress={() => router.push("/app/(tabs)/home")}
-           />
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
