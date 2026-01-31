@@ -2,10 +2,12 @@ import ButtonComponent from "@/src/components/ButtonComponent";
 import FormLabel from "@/src/components/FormLabel";
 import InputComponent from "@/src/components/InputComponent";
 import SelectComponent from "@/src/components/SelectComponent";
+import { appService } from "@/src/services/appApi/appService";
 import { useTheme } from "@/src/theme";
+import toast from "@/src/utils/toast";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   Text,
@@ -53,9 +55,41 @@ const Compensation = () => {
   const [stipendRequired, setStipendRequired] = useState("");
   const [visaAssistanceRequired, setVisaAssistanceRequired] = useState("");
   const [sponsorshipRequired, setSponsorshipRequired] = useState("");
-  const [selectedBenefits, setSelectedBenefits] = useState<string[]>(
-    preferredBenefits.slice(0, 3)
-  );
+  const [selectedBenefits, setSelectedBenefits] = useState<string[]>([]);
+  const [hasCompensation, setHasCompensation] = useState(false);
+
+  useEffect(() => {
+    fetchCompensation();
+  }, []);
+
+  const fetchCompensation = async () => {
+    try {
+      const response = await appService.getCompensation();
+      if (response.data.success && response.data.data) {
+        const data = response.data.data;
+
+        setSalaryType(data.salaryType || "Annual Salary");
+        setMinimumSalary(data.salaryRange?.minimum?.toString() || "");
+        setMaximumSalary(data.salaryRange?.maximum?.toString() || "");
+        setSalaryNegotiable(data.salaryRange?.isNegotiable ?? true);
+
+        setExpectedHourlyRate(data.additionalCompensation?.expectedHourlyRate?.toString() || "");
+        setExpectedWeeklyPay(data.additionalCompensation?.expectedWeeklyPay?.toString() || "");
+        setExpectedTravelPackage(data.additionalCompensation?.expectedTravelPackage || "");
+
+        setHousingNeeded(data.requirements?.accommodationNeeded ? "Yes" : "No");
+        setStipendRequired(data.requirements?.stipendRequired ? "Yes" : "No");
+        setVisaAssistanceRequired(data.requirements?.visaAssistanceRequired ? "Yes" : "No");
+        setSponsorshipRequired(data.requirements?.sponsorshipRequired ? "Yes" : "No");
+
+        setSelectedBenefits(data.preferredBenefits || []);
+
+        setHasCompensation(true);
+      }
+    } catch (error) {
+      console.log('Error fetching compensation:', error);
+    }
+  };
 
   const handleBenefitToggle = (benefit: string) => {
     if (selectedBenefits.includes(benefit)) {
@@ -65,22 +99,48 @@ const Compensation = () => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const payload = {
       salaryType,
-      minimumSalary,
-      maximumSalary,
-      salaryNegotiable,
-      expectedHourlyRate,
-      expectedWeeklyPay,
-      expectedTravelPackage,
-      housingNeeded,
-      stipendRequired,
-      visaAssistanceRequired,
-      sponsorshipRequired,
-      selectedBenefits,
+      salaryRange: {
+        minimum: minimumSalary ? parseInt(minimumSalary) : 0,
+        maximum: maximumSalary ? parseInt(maximumSalary) : 0,
+        isNegotiable: salaryNegotiable,
+      },
+      additionalCompensation: {
+        expectedHourlyRate: expectedHourlyRate ? parseFloat(expectedHourlyRate) : null,
+        expectedWeeklyPay: expectedWeeklyPay ? parseFloat(expectedWeeklyPay) : null,
+        expectedTravelPackage: expectedTravelPackage || null,
+      },
+      requirements: {
+        accommodationNeeded: housingNeeded === "Yes",
+        stipendRequired: stipendRequired === "Yes",
+        visaAssistanceRequired: visaAssistanceRequired === "Yes",
+        sponsorshipRequired: sponsorshipRequired === "Yes",
+      },
+      preferredBenefits: selectedBenefits,
     };
-    console.log("Compensation Submitted:", payload);
+
+    try {
+      let response;
+      if (hasCompensation) {
+        response = await appService.updateCompensation(payload);
+      } else {
+        response = await appService.saveCompensation(payload);
+      }
+
+      if (response.data.success) {
+        toast.success(response.data.message || "Compensation details saved successfully.");
+        setHasCompensation(true);
+      }
+    } catch (error: any) {
+      console.log("Error saving compensation:", error);
+      toast.error(
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to save compensation."
+      );
+    }
   };
 
   return (
@@ -107,7 +167,7 @@ const Compensation = () => {
         className="flex-1 px-4"
         contentContainerStyle={{ paddingBottom: 120, paddingTop: 16 }}
       >
-       
+
         <View className="mb-4">
           <FormLabel>Salary Type</FormLabel>
           <SelectComponent
@@ -115,7 +175,7 @@ const Compensation = () => {
             onChange={setSalaryType}
             options={salaryTypeOptions}
             placeholder="Select Type"
-            
+
           />
         </View>
 
@@ -150,11 +210,10 @@ const Compensation = () => {
           className="flex-row items-center mb-6"
         >
           <View
-            className={`w-5 h-5 rounded border-2 mr-3 items-center justify-center ${
-              salaryNegotiable
+            className={`w-5 h-5 rounded border-2 mr-3 items-center justify-center ${salaryNegotiable
                 ? "bg-primary-main border-primary-main"
                 : "bg-white border-gray-medium"
-            }`}
+              }`}
           >
             {salaryNegotiable && (
               <Ionicons name="checkmark" size={14} color="white" />
@@ -253,16 +312,14 @@ const Compensation = () => {
                 <TouchableOpacity
                   key={benefit}
                   onPress={() => handleBenefitToggle(benefit)}
-                  className={`px-4 py-2 rounded-full border ${
-                    isSelected
+                  className={`px-4 py-2 rounded-full border ${isSelected
                       ? "bg-primary-main border-primary-main"
                       : "bg-white border-gray-medium"
-                  }`}
+                    }`}
                 >
                   <Text
-                    className={`text-small font-medium ${
-                      isSelected ? "text-white" : "text-text-secondary"
-                    }`}
+                    className={`text-small font-medium ${isSelected ? "text-white" : "text-text-secondary"
+                      }`}
                   >
                     {benefit}
                   </Text>
@@ -273,8 +330,11 @@ const Compensation = () => {
         </View>
       </ScrollView>
 
-        <View className="px-4 pb-2 mt-auto">
-        <ButtonComponent title="Save Compensation" />
+      <View className="px-4 pb-2 mt-auto">
+        <ButtonComponent
+          title="Save Compensation"
+          onPress={handleSave}
+        />
       </View>
     </SafeAreaView>
   );

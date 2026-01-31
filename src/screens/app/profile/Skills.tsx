@@ -1,8 +1,10 @@
 import ButtonComponent from "@/src/components/ButtonComponent";
+import { appService } from "@/src/services/appApi/appService";
 import { useTheme } from "@/src/theme";
+import toast from "@/src/utils/toast";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   Text,
@@ -58,6 +60,26 @@ const Skills = () => {
   const [clinicalSkills, setClinicalSkills] = useState<string[]>([]);
   const [technicalSkills, setTechnicalSkills] = useState<string[]>([]);
   const [softSkills, setSoftSkills] = useState<string[]>([]);
+  const [hasSkills, setHasSkills] = useState(false);
+
+  useEffect(() => {
+    fetchSkills();
+  }, []);
+
+  const fetchSkills = async () => {
+    try {
+      const response = await appService.getSkills();
+      if (response.data.success && response.data.data) {
+        const data = response.data.data;
+        setClinicalSkills(data.clinical || []);
+        setTechnicalSkills(data.technical || []);
+        setSoftSkills(data.soft || []);
+        setHasSkills(true);
+      }
+    } catch (error) {
+      console.log('Error fetching skills:', error);
+    }
+  };
 
   const [clinicalInput, setClinicalInput] = useState("");
   const [technicalInput, setTechnicalInput] = useState("");
@@ -89,13 +111,33 @@ const Skills = () => {
     setSkills(skills.filter((s) => s !== skill));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const payload = {
-      clinicalSkills,
-      technicalSkills,
-      softSkills,
+      clinical: clinicalSkills,
+      technical: technicalSkills,
+      soft: softSkills,
     };
-    console.log("Skills Submitted:", payload);
+
+    try {
+      let response;
+      if (hasSkills) {
+        response = await appService.updateSkills(payload);
+      } else {
+        response = await appService.saveSkills(payload);
+      }
+
+      if (response.data.success) {
+        toast.success(response.data.message || "Skills saved successfully.");
+        setHasSkills(true);
+      }
+    } catch (error: any) {
+      console.log("Error saving skills:", error);
+      toast.error(
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to save skills."
+      );
+    }
   };
 
   const renderSkillSection = (
@@ -110,9 +152,9 @@ const Skills = () => {
     showOptions: boolean,
     setShowOptions: React.Dispatch<React.SetStateAction<boolean>>,
     options: string[],
-     borderColor?: string
+    borderColor?: string
   ) => (
-    <View className="mb-4 p-4 rounded-xl" style={{ backgroundColor: bgColor, borderWidth: 0.5, borderColor: borderColor || textColor,  }}>
+    <View className="mb-4 p-4 rounded-xl" style={{ backgroundColor: bgColor, borderWidth: 0.5, borderColor: borderColor || textColor, }}>
       <View className="flex-row items-center mb-3">
         <Ionicons name={icon as any} size={20} color={textColor} />
         <Text className="text-h4 font-semibold ml-2" style={{ color: textColor }}>
@@ -182,17 +224,17 @@ const Skills = () => {
                 {!options.some((option) =>
                   option.toLowerCase().includes(input.toLowerCase())
                 ) && (
-                  <TouchableOpacity
-                    onPress={() =>
-                      addSkill(input, skills, setSkills, setInput, setShowOptions)
-                    }
-                    className="px-4 py-3"
-                  >
-                    <Text className="text-body1 font-medium" style={{ color: textColor }}>
-                      Add "{input}"
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                    <TouchableOpacity
+                      onPress={() =>
+                        addSkill(input, skills, setSkills, setInput, setShowOptions)
+                      }
+                      className="px-4 py-3"
+                    >
+                      <Text className="text-body1 font-medium" style={{ color: textColor }}>
+                        Add "{input}"
+                      </Text>
+                    </TouchableOpacity>
+                  )}
               </ScrollView>
             </View>
           )}
@@ -237,7 +279,7 @@ const Skills = () => {
           showClinicalOptions,
           setShowClinicalOptions,
           clinicalSkillOptions,
-           "#0066CC"
+          "#0066CC"
         )}
 
         {renderSkillSection(
@@ -267,13 +309,14 @@ const Skills = () => {
           showSoftOptions,
           setShowSoftOptions,
           softSkillOptions,
-           "#B366FF"
+          "#B366FF"
         )}
       </ScrollView>
 
       <View className="px-4 pb-2 mt-auto">
-       <ButtonComponent
-       title="Save Skills"
+        <ButtonComponent
+          title="Save Skills"
+          onPress={handleSave}
         />
       </View>
     </SafeAreaView>

@@ -1,9 +1,11 @@
 import ButtonComponent from "@/src/components/ButtonComponent";
 import SelectComponent from "@/src/components/SelectComponent";
+import { appService } from "@/src/services/appApi/appService";
 import { useTheme } from "@/src/theme";
+import toast from "@/src/utils/toast";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   Switch,
@@ -14,13 +16,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const travelOptions = ["Travel Nurse", "Stationary Nurse", "Hybrid"];
-const stateOptions = ["State A", "State B", "State C"];
+const stateOptions = ["Gujarat", "Maharashtra", "Goa"];
 const countryOptions = ["USA", "Canada", "UK", "Australia"];
 const primaryCategoriesOptions = [
-  { label: "Travel Nurse", value: "travel" },
-  { label: "Stationary Nurse", value: "stationary" },
-  { label: "Specialized Nurse", value: "specialized" },
-  { label: "Crisis / Humanitarian Nurse", value: "humanitarian" },
+  { label: "Travel Nurse", value: "Travel Nurse" },
+  { label: "Stationary Nurse", value: "Stationary Nurse" },
+  { label: "Specialized Nurse", value: "Specialized Nurse" },
+  { label: "Crisis / Humanitarian Nurse", value: "Crisis / Humanitarian Nurse" },
 ];
 const humanitarianRolesOptions = [
   "Humanitarian Nurse",
@@ -44,6 +46,50 @@ const Preference: React.FC = () => {
   const [preferredCountries, setPreferredCountries] = useState<string[]>([]);
   const [primaryCategory, setPrimaryCategory] = useState<string[]>([]);
   const [humanitarianRole, setHumanitarianRole] = useState<string[]>([]);
+  const [hasPreferences, setHasPreferences] = useState(false);
+
+  useEffect(() => {
+    fetchPreferences();
+  }, []);
+
+  const fetchPreferences = async () => {
+    try {
+      const response = await appService.getPreferences();
+      if (response.data.success && response.data.data) {
+        const data = response.data.data;
+
+        // Map API data to state
+        setRelocationStates(data.relocationPreferences || []);
+        setWillingnessToRelocate(data.relocationPreferences?.length > 0);
+
+        setTravelPreference(data.travelPreferences || []);
+        setWillingToTravel(data.travelPreferences?.length > 0);
+
+        setPreferredCountries(data.internationalRelocationPreferences || []);
+        setInternationalRelocation(data.internationalRelocationPreferences?.length > 0);
+
+        // Normalize legacy values
+        const legacyMapping: Record<string, string> = {
+          travel: "Travel Nurse",
+          stationary: "Stationary Nurse",
+          specialized: "Specialized Nurse",
+          humanitarian: "Crisis / Humanitarian Nurse",
+        };
+
+        const rawCategories = data.primaryCategories || [];
+        const normalizedCategories = rawCategories.map((c: string) => legacyMapping[c] || c);
+        // Deduplicate and filter to ensure only valid current options are kept or mapped
+        const uniqueCategories = Array.from(new Set(normalizedCategories)) as string[];
+        setPrimaryCategory(uniqueCategories);
+
+        setHumanitarianRole(data.crisisHumanitarianPreferences || []);
+
+        setHasPreferences(true);
+      }
+    } catch (error) {
+      console.log('Error fetching preferences:', error);
+    }
+  };
 
   const toggleArrayValue = (
     value: string,
@@ -57,18 +103,35 @@ const Preference: React.FC = () => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Ensure we only send valid values for primaryCategories
+    const validCategoryValues = primaryCategoriesOptions.map(o => o.value);
+    const cleanedPrimaryCategories = primaryCategory.filter(c => validCategoryValues.includes(c));
+
     const payload = {
-      willingnessToRelocate,
-      willingToTravel,
-      travelPreference,
-      relocationStates,
-      internationalRelocation,
-      preferredCountries,
-      primaryCategory,
-      humanitarianRole,
+      relocationPreferences: willingnessToRelocate ? relocationStates : [],
+      travelPreferences: willingToTravel ? travelPreference : [],
+      internationalRelocationPreferences: internationalRelocation ? preferredCountries : [],
+      primaryCategories: cleanedPrimaryCategories,
+      crisisHumanitarianPreferences: primaryCategory.includes("Crisis / Humanitarian Nurse") ? humanitarianRole : [],
     };
-    console.log("Preferences Submitted:", payload);
+
+    try {
+      let response;
+      if (hasPreferences) {
+        response = await appService.updatePreferences(payload);
+      } else {
+        response = await appService.savePreferences(payload);
+      }
+
+      if (response.data.success) {
+        toast.success(response.data.message || "Preferences saved successfully.");
+        setHasPreferences(true);
+      }
+    } catch (error: any) {
+      console.log('Error saving preferences:', error);
+      toast.error(error.response?.data?.message || error.message || "Failed to save preferences.");
+    }
   };
 
   return (
@@ -105,7 +168,7 @@ const Preference: React.FC = () => {
         {willingnessToRelocate && (
           <SelectComponent
             value={relocationStates[0] || ""}
-            onChange={(val:any) => setRelocationStates([val])}
+            onChange={(val: any) => setRelocationStates([val])}
             options={stateOptions.map((s) => ({ label: s, value: s }))}
             placeholder="Select Relocation State"
           />
@@ -133,27 +196,24 @@ const Preference: React.FC = () => {
                   onPress={() =>
                     toggleArrayValue(item, travelPreference, setTravelPreference)
                   }
-                  className={`flex-row items-center px-4 py-3 mb-2 rounded-lg border ${
-                    selected
-                      ? "bg-primary-light1 border-primary-light1"
-                      : "bg-white border-gray-light"
-                  }`}
+                  className={`flex-row items-center px-4 py-3 mb-2 rounded-lg border ${selected
+                    ? "bg-primary-light1 border-primary-light1"
+                    : "bg-white border-gray-light"
+                    }`}
                 >
                   <View
-                    className={`w-5 h-5 rounded border mr-3 items-center justify-center ${
-                      selected
-                        ? "bg-primary-main border-white"
-                        : "bg-white border-gray-medium"
-                    }`}
+                    className={`w-5 h-5 rounded border mr-3 items-center justify-center ${selected
+                      ? "bg-primary-main border-white"
+                      : "bg-white border-gray-medium"
+                      }`}
                   >
                     {selected && (
                       <Ionicons name="checkmark" size={16} color="white" />
                     )}
                   </View>
                   <Text
-                    className={`text-small ${
-                      selected ? "text-primary-main font-medium" : "text-text-primary"
-                    }`}
+                    className={`text-small ${selected ? "text-primary-main font-medium" : "text-text-primary"
+                      }`}
                   >
                     {item}
                   </Text>
@@ -178,7 +238,7 @@ const Preference: React.FC = () => {
         {internationalRelocation && (
           <SelectComponent
             value={preferredCountries[0] || ""}
-            onChange={(val:any) => setPreferredCountries([val])}
+            onChange={(val: any) => setPreferredCountries([val])}
             options={countryOptions.map((c) => ({ label: c, value: c }))}
             placeholder="Select Country"
           />
@@ -202,27 +262,24 @@ const Preference: React.FC = () => {
                       setPrimaryCategory
                     )
                   }
-                  className={`flex-row items-center px-4 py-3 mb-2 rounded-lg border ${
-                    selected
-                      ? "bg-primary-light1 border-primary-light1"
-                      : "bg-white border-gray-light"
-                  }`}
+                  className={`flex-row items-center px-4 py-3 mb-2 rounded-lg border ${selected
+                    ? "bg-primary-light1 border-primary-light1"
+                    : "bg-white border-gray-light"
+                    }`}
                 >
                   <View
-                    className={`w-5 h-5 rounded border mr-3 items-center justify-center ${
-                      selected
-                        ? "bg-primary-main border-white"
-                        : "bg-white border-gray-medium"
-                    }`}
+                    className={`w-5 h-5 rounded border mr-3 items-center justify-center ${selected
+                      ? "bg-primary-main border-white"
+                      : "bg-white border-gray-medium"
+                      }`}
                   >
                     {selected && (
                       <Ionicons name="checkmark" size={16} color="white" />
                     )}
                   </View>
                   <Text
-                    className={`text-small ${
-                      selected ? "text-primary-main font-medium" : "text-text-primary"
-                    }`}
+                    className={`text-small ${selected ? "text-primary-main font-medium" : "text-text-primary"
+                      }`}
                   >
                     {item.label}
                   </Text>
@@ -232,7 +289,7 @@ const Preference: React.FC = () => {
           </View>
         )}
 
-        {primaryCategory.includes("humanitarian") && (
+        {primaryCategory.includes("Crisis / Humanitarian Nurse") && (
           <>
             <Text className="text-h4 font-medium mt-4 mb-2 text-text-primary">
               Humanitarian Roles
@@ -250,29 +307,26 @@ const Preference: React.FC = () => {
                         setHumanitarianRole
                       )
                     }
-                    className={`flex-row items-center px-4 py-3 mb-2 rounded-lg border ${
-                      selected
-                        ? "bg-primary-light1 border-primary-light1"
-                        : "bg-white border-gray-light"
-                    }`}
+                    className={`flex-row items-center px-4 py-3 mb-2 rounded-lg border ${selected
+                      ? "bg-primary-light1 border-primary-light1"
+                      : "bg-white border-gray-light"
+                      }`}
                   >
                     <View
-                      className={`w-5 h-5 rounded border mr-3 items-center justify-center ${
-                        selected
-                          ? "bg-primary-main border-white"
-                          : "bg-white border-gray-medium"
-                      }`}
+                      className={`w-5 h-5 rounded border mr-3 items-center justify-center ${selected
+                        ? "bg-primary-main border-white"
+                        : "bg-white border-gray-medium"
+                        }`}
                     >
                       {selected && (
                         <Ionicons name="checkmark" size={16} color="white" />
                       )}
                     </View>
                     <Text
-                      className={`text-small ${
-                        selected
-                          ? "text-primary-main font-medium"
-                          : "text-text-primary"
-                      }`}
+                      className={`text-small ${selected
+                        ? "text-primary-main font-medium"
+                        : "text-text-primary"
+                        }`}
                     >
                       {item}
                     </Text>
@@ -285,7 +339,7 @@ const Preference: React.FC = () => {
       </ScrollView>
 
       <View className="px-4 pb-2 mt-auto">
-        <ButtonComponent title="Save Preferences" />
+        <ButtonComponent title="Save Preferences" onPress={handleSave} />
       </View>
     </SafeAreaView>
   );

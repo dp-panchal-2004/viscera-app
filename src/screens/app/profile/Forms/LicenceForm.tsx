@@ -7,17 +7,18 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useState } from "react";
 import {
-    Modal,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 interface LicenceFormProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
+  initialData?: any;
 }
 
 
@@ -52,14 +53,35 @@ const specialtyOptions = [
   { label: "OR", value: "OR" },
 ];
 
-const LicenceForm = ({ visible, onClose, onSubmit }: LicenceFormProps) => {
+const LicenceForm = ({ visible, onClose, onSubmit, initialData }: LicenceFormProps) => {
   const [licenseType, setLicenseType] = useState("");
-  const [licenseState, setLicenseState] = useState("");
+  const [states, setStates] = useState<string[]>([]);
   const [licenseNumber, setLicenseNumber] = useState("");
   const [expiryDate, setExpiryDate] = useState<Date | undefined>();
-  const [multiStateLicense, setMultiStateLicense] = useState("");
+  const [isMultiState, setIsMultiState] = useState("");
   const [specialtyCertifications, setSpecialtyCertifications] = useState<string[]>([]);
   const [credentialFile, setCredentialFile] = useState<any>(null);
+
+  // Populate form when editing
+  React.useEffect(() => {
+    if (initialData) {
+      setLicenseType(initialData.licenseType || "");
+      setStates(initialData.states || []);
+      setLicenseNumber(initialData.licenseNumber || "");
+      setExpiryDate(initialData.expiryDate ? new Date(initialData.expiryDate) : undefined);
+      setIsMultiState(initialData.isMultiState ? "yes" : "no");
+      setSpecialtyCertifications(initialData.specialties || []);
+    } else {
+      // Reset form when adding new
+      setLicenseType("");
+      setStates([]);
+      setLicenseNumber("");
+      setExpiryDate(undefined);
+      setIsMultiState("");
+      setSpecialtyCertifications([]);
+      setCredentialFile(null);
+    }
+  }, [initialData, visible]);
 
   const handleUpload = async () => {
     const res = await DocumentPicker.getDocumentAsync({
@@ -72,13 +94,18 @@ const LicenceForm = ({ visible, onClose, onSubmit }: LicenceFormProps) => {
   };
 
   const handleSubmit = () => {
+    // Format date as YYYY-MM-DD
+    const formattedDate = expiryDate
+      ? `${expiryDate.getFullYear()}-${String(expiryDate.getMonth() + 1).padStart(2, '0')}-${String(expiryDate.getDate()).padStart(2, '0')}`
+      : "";
+
     onSubmit({
       licenseType,
-      licenseState,
+      states,
       licenseNumber,
-      expiryDate,
-      multiStateLicense,
-      specialtyCertifications,
+      expiryDate: formattedDate,
+      isMultiState: isMultiState === "yes" ? "true" : "false",
+      specialties: specialtyCertifications,
       credentialFile,
     });
     onClose();
@@ -107,12 +134,13 @@ const LicenceForm = ({ visible, onClose, onSubmit }: LicenceFormProps) => {
             </View>
 
             <View className="mb-4">
-              <FormLabel>License State</FormLabel>
+              <FormLabel>License State(s)</FormLabel>
               <SelectComponent
-                value={licenseState}
-                onChange={setLicenseState}
-                placeholder="Select state"
+                value={states}
+                onChange={setStates}
+                placeholder="Select state(s)"
                 options={stateOptions}
+                multiple
               />
             </View>
 
@@ -137,8 +165,8 @@ const LicenceForm = ({ visible, onClose, onSubmit }: LicenceFormProps) => {
             <View className="mb-4">
               <FormLabel>Multi-State License</FormLabel>
               <SelectComponent
-                value={multiStateLicense}
-                onChange={setMultiStateLicense}
+                value={isMultiState}
+                onChange={setIsMultiState}
                 placeholder="Select"
                 options={yesNoOptions}
               />

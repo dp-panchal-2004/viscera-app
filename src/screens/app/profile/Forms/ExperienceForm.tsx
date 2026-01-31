@@ -4,19 +4,20 @@ import FormLabel from "@/src/components/FormLabel";
 import InputComponent from "@/src/components/InputComponent";
 import SelectComponent from "@/src/components/SelectComponent";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-    Modal,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 interface ExperienceFormProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
+  initialData?: any; // Add initialData for editing
 }
 
 
@@ -38,70 +39,68 @@ const shiftTypeOptions = [
   { label: "Not Applicable", value: "Not Applicable" },
 ];
 
-const contractOptions = [
-  { label: "Less than a Month", value: "LESS_THAN_1_MONTH" },
-  { label: "Between 3 to 6 Months", value: "3_TO_6_MONTHS" },
-  { label: "Between 6 to 12 Months", value: "6_TO_12_MONTHS" },
-  { label: "Between 12 to 18 Months", value: "12_TO_18_MONTHS" },
-  { label: "More than 2 Years", value: "MORE_THAN_2_YEARS" },
-];
-
-const locationOptions = [
-  { label: "Rural", value: "Rural" },
-  { label: "Urban", value: "Urban" },
-  { label: "Hybrid", value: "Hybrid" },
-  { label: "Remote", value: "Remote" },
-  { label: "NA", value: "NA" },
-];
+// Contract duration is now a number (weeks), so we don't need options for it, but we use Input.
 
 const yesNoOptions = [
-  { label: "Yes", value: "Yes" },
-  { label: "No", value: "No" },
+  { label: "Yes", value: "true" },
+  { label: "No", value: "false" },
 ];
 
-const ExperienceForm = ({ visible, onClose, onSubmit }: ExperienceFormProps) => {
+const ExperienceForm = ({ visible, onClose, onSubmit, initialData }: ExperienceFormProps) => {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
-  const [totalYears, setTotalYears] = useState("");
-  const [specialtyYears, setSpecialtyYears] = useState("");
-  const [lastPositionTitle, setLastPositionTitle] = useState("");
-  const [lastEmployer, setLastEmployer] = useState("");
+
+  const [specialty, setSpecialty] = useState("");
+  const [positionTitle, setPositionTitle] = useState("");
+  const [employer, setEmployer] = useState("");
   const [jobType, setJobType] = useState("");
   const [shiftType, setShiftType] = useState("");
-  const [contractDuration, setContractDuration] = useState("");
-  const [locationType, setLocationType] = useState("");
-  const [highAcuity, setHighAcuity] = useState("");
+  const [contractDurationWeeks, setContractDurationWeeks] = useState("");
+  const [location, setLocation] = useState("");
+  const [highAcuitySetting, setHighAcuitySetting] = useState(""); // "true" or "false" string for select
 
-  const calculateExperience = (start?: Date, end?: Date) => {
-    if (!start) return "";
-
-    const startD = new Date(start);
-    const endD = end ? new Date(end) : new Date();
-
-    let years = endD.getFullYear() - startD.getFullYear();
-    let months = endD.getMonth() - startD.getMonth();
-
-    if (months < 0) {
-      years--;
-      months += 12;
+  useEffect(() => {
+    if (visible) {
+      if (initialData) {
+        setStartDate(initialData.startDate ? new Date(initialData.startDate) : undefined);
+        setEndDate(initialData.endDate ? new Date(initialData.endDate) : undefined);
+        setSpecialty(initialData.specialty || "");
+        setPositionTitle(initialData.positionTitle || "");
+        setEmployer(initialData.employer || "");
+        setJobType(initialData.jobType || "");
+        setShiftType(initialData.shiftType || "");
+        setContractDurationWeeks(initialData.contractDurationWeeks ? String(initialData.contractDurationWeeks) : "");
+        setLocation(initialData.location || "");
+        setHighAcuitySetting(initialData.highAcuitySetting !== undefined ? String(initialData.highAcuitySetting) : "false");
+      } else {
+        // Reset form
+        setStartDate(undefined);
+        setEndDate(undefined);
+        setSpecialty("");
+        setPositionTitle("");
+        setEmployer("");
+        setJobType("");
+        setShiftType("");
+        setContractDurationWeeks("");
+        setLocation("");
+        setHighAcuitySetting("false");
+      }
     }
+  }, [visible, initialData]);
 
-    return `${years} years ${months} months`;
-  };
 
   const handleSubmit = () => {
     onSubmit({
       startDate,
       endDate,
-      totalYears,
-      specialtyYears,
-      lastPositionTitle,
-      lastEmployer,
+      specialty,
+      positionTitle,
+      employer,
       jobType,
       shiftType,
-      contractDuration,
-      locationType,
-      highAcuity,
+      contractDurationWeeks: contractDurationWeeks ? parseInt(contractDurationWeeks, 10) : null,
+      location,
+      highAcuitySetting: highAcuitySetting === "true",
     });
     onClose();
   };
@@ -113,7 +112,7 @@ const ExperienceForm = ({ visible, onClose, onSubmit }: ExperienceFormProps) => 
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-h3 font-semibold text-text-primary">
-                Add Experience
+                {initialData ? "Edit Experience" : "Add Experience"}
               </Text>
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close-circle-outline" size={22} />
@@ -124,10 +123,7 @@ const ExperienceForm = ({ visible, onClose, onSubmit }: ExperienceFormProps) => 
               <FormLabel>Start Date</FormLabel>
               <DatePickerComponent
                 value={startDate}
-                onChange={(date) => {
-                  setStartDate(date);
-                  setTotalYears(calculateExperience(date, endDate));
-                }}
+                onChange={setStartDate}
                 placeholder="Select start date"
               />
             </View>
@@ -136,43 +132,35 @@ const ExperienceForm = ({ visible, onClose, onSubmit }: ExperienceFormProps) => 
               <FormLabel>End Date</FormLabel>
               <DatePickerComponent
                 value={endDate}
-                onChange={(date) => {
-                  setEndDate(date);
-                  setTotalYears(calculateExperience(startDate, date));
-                }}
+                onChange={setEndDate}
                 placeholder="Select end date (optional)"
               />
             </View>
 
             <View className="mb-4">
-              <FormLabel>Total Experience</FormLabel>
-              <InputComponent value={totalYears} editable={false} />
-            </View>
-
-            <View className="mb-4">
-              <FormLabel>Specialty Experience</FormLabel>
+              <FormLabel>Specialty</FormLabel>
               <InputComponent
-                placeholder="Years in specialty"
-                value={specialtyYears}
-                onChangeText={setSpecialtyYears}
+                placeholder="e.g. Emergency Nursing"
+                value={specialty}
+                onChangeText={setSpecialty}
               />
             </View>
 
             <View className="mb-4">
               <FormLabel>Position Title</FormLabel>
               <InputComponent
-                placeholder="Last position title"
-                value={lastPositionTitle}
-                onChangeText={setLastPositionTitle}
+                placeholder="e.g. Registered Nurse"
+                value={positionTitle}
+                onChangeText={setPositionTitle}
               />
             </View>
 
             <View className="mb-4">
-              <FormLabel>Employer (optional)</FormLabel>
+              <FormLabel>Employer</FormLabel>
               <InputComponent
-                placeholder="Last employer"
-                value={lastEmployer}
-                onChangeText={setLastEmployer}
+                placeholder="e.g. Gotham General Hospital"
+                value={employer}
+                onChangeText={setEmployer}
               />
             </View>
 
@@ -197,36 +185,35 @@ const ExperienceForm = ({ visible, onClose, onSubmit }: ExperienceFormProps) => 
             </View>
 
             <View className="mb-4">
-              <FormLabel>Contract Duration</FormLabel>
-              <SelectComponent
-                value={contractDuration}
-                onChange={setContractDuration}
-                placeholder="Select duration"
-                options={contractOptions}
+              <FormLabel>Contract Duration (Weeks)</FormLabel>
+              <InputComponent
+                placeholder="e.g. 13"
+                value={contractDurationWeeks}
+                onChangeText={setContractDurationWeeks}
+                keyboardType="numeric"
               />
             </View>
 
             <View className="mb-4">
               <FormLabel>Location</FormLabel>
-              <SelectComponent
-                value={locationType}
-                onChange={setLocationType}
-                placeholder="Select location"
-                options={locationOptions}
+              <InputComponent
+                placeholder="e.g. Houston, TX"
+                value={location}
+                onChangeText={setLocation}
               />
             </View>
 
             <View className="mb-4">
               <FormLabel>High-Acuity Setting</FormLabel>
               <SelectComponent
-                value={highAcuity}
-                onChange={setHighAcuity}
+                value={highAcuitySetting}
+                onChange={setHighAcuitySetting}
                 placeholder="Select"
                 options={yesNoOptions}
               />
             </View>
 
-            <View className="flex-row justify-end gap-3 mt-4">
+            <View className="flex-row justify-end gap-3 mt-4 mb-6">
               <ButtonComponent title="Cancel" variant="outlined" onPress={onClose} />
               <ButtonComponent title="Submit" onPress={handleSubmit} />
             </View>
