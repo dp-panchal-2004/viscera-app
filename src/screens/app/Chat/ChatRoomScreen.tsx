@@ -1,8 +1,12 @@
 import ChatInput from "@/src/components/ChatInput";
+import chatService from "@/src/services/chatService";
+import socketService from "@/src/services/socketService";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -15,44 +19,77 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const ChatRoomScreen = () => {
   const router = useRouter();
-  const { name, avatar } = useLocalSearchParams();
+  const { conversationId, name, avatar } = useLocalSearchParams();
   const flatListRef = useRef<FlatList>(null);
 
-  const [messages, setMessages] = useState([
-    {
-      id: "1",
-      text: `Hi Sarah, are you available for a call?`,
-      isMe: false,
-      time: "10:42 AM",
-    },
-    {
-      id: "2",
-      text: "Yes, I’m available. What time works for you?",
-      isMe: true,
-      time: "10:45 AM",
-    },
-  ]);
-
-  const handleSend = (text: string) => {
-    if (!text.trim()) return;
-
-    const newMessage = {
-      id: Date.now().toString(),
-      text,
-      isMe: true,
-      time: "Now",
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
-
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  };
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    flatListRef.current?.scrollToEnd({ animated: false });
-  }, []);
+    loadInitialData();
+
+    // Initialize socket and join conversation
+    socketService.initialize();
+    if (conversationId) {
+      socketService.joinConversation(conversationId as string);
+    }
+
+    // Listen for new messages
+    socketService.onNewMessage((newMessage) => {
+      setMessages((prev) => [...prev, newMessage]);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+
+    return () => {
+      socketService.offNewMessage();
+    };
+  }, [conversationId]);
+
+  const loadInitialData = async () => {
+    try {
+      // Get current user ID to distinguish "me" vs "them"
+      const userStr = await AsyncStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setCurrentUserId(user.id || user._id);
+      }
+
+      if (conversationId) {
+        const response = await chatService.getMessages(conversationId as string);
+        setMessages(response.data || []);
+      }
+    } catch (error) {
+      console.error("Error loading chat data:", error);
+    } finally {
+      setLoading(false);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 300);
+    }
+  };
+
+  const handleSend = async (text: string) => {
+    if (!text.trim() || !conversationId) return;
+
+    try {
+      // Send via API as requested for reliability
+      await chatService.sendMessage(conversationId as string, text);
+      // Note: The socket will automatically receive the "new_message" event and update the UI
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center">
+        <ActivityIndicator size="large" color="#000" />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -84,33 +121,36 @@ const ChatRoomScreen = () => {
         <FlatList
           ref={flatListRef}
           data={messages}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
           contentContainerStyle={{ padding: 16, paddingBottom: 80 }}
           keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => (
-            <View
-              className={`mb-3 max-w-[75%] ${item.isMe ? "self-end items-end" : "self-start items-start"
-                }`}
-            >
+          renderItem={({ item }) => {
+            const isMe = item.from === currentUserId || item.senderId === currentUserId || item.isMe;
+            return (
               <View
-                className={`px-4 py-3 rounded-2xl ${item.isMe
-                    ? "bg-primary-main rounded-br-sm"
-                    : "bg-gray-white border border-gray-light rounded-bl-sm"
+                className={`mb-3 max-w-[75%] ${isMe ? "self-end items-end" : "self-start items-start"
                   }`}
               >
-                <Text
-                  className={`text-body1 ${item.isMe ? "text-gray-white" : "text-text-primary"
+                <View
+                  className={`px-4 py-3 rounded-2xl ${isMe
+                    ? "bg-primary-main rounded-br-sm"
+                    : "bg-gray-white border border-gray-light rounded-bl-sm"
                     }`}
                 >
-                  {item.text}
+                  <Text
+                    className={`text-body1 ${isMe ? "text-gray-white" : "text-text-primary"
+                      }`}
+                  >
+                    {item.content || item.text}
+                  </Text>
+                </View>
+
+                <Text className="text-caption text-text-secondary mt-1">
+                  {item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (item.time || "Now")}
                 </Text>
               </View>
-
-              <Text className="text-caption text-text-secondary mt-1">
-                {item.time}
-              </Text>
-            </View>
-          )}
+            );
+          }}
         />
 
         <ChatInput onSend={handleSend} />

@@ -20,13 +20,16 @@ export const MyApplications = () => {
   const router = useRouter();
   return (
     <View className="mb-4">
-     
+
       <View className="flex-row justify-between items-center mb-3">
         <Text className="font-inter font-bold text-h4 text-text-primary">
           My Applications
         </Text>
 
-        <TouchableOpacity onPress={() => router.push('/app/(tabs)/jobs')}>
+        <TouchableOpacity onPress={() => router.push({
+          pathname: "/app/(tabs)/jobs",
+          params: { tab: 'applied' }
+        })}>
           <Text className="font-inter font-bold text-body1 text-primary-main">
             View All
           </Text>
@@ -38,7 +41,7 @@ export const MyApplications = () => {
           key={app.id}
           className="bg-gray-white border border-gray-medium rounded-xl p-4 mb-3 flex-row justify-between items-center"
         >
-          
+
           <View>
             <Text className="font-inter font-semibold text-h4 text-text-primary">
               {app.title}
@@ -53,24 +56,22 @@ export const MyApplications = () => {
             </Text>
           </View>
 
-         
+
           <View
-            className={`px-3 py-1 rounded-md ${
-              app.status === "viewed"
+            className={`px-3 py-1 rounded-md ${app.status === "viewed"
                 ? "bg-primary-light1"
                 : app.status === "shortlisted"
-                ? "bg-actionLight-green"
-                : "bg-secondary-light1"
-            }`}
+                  ? "bg-actionLight-green"
+                  : "bg-secondary-light1"
+              }`}
           >
             <Text
-              className={`font-inter font-semibold text-caption ${
-                app.status === "viewed"
+              className={`font-inter font-semibold text-caption ${app.status === "viewed"
                   ? "text-primary-main"
                   : app.status === "shortlisted"
-                  ? "text-action-green"
-                  : "text-secondary-main"
-              }`}
+                    ? "text-action-green"
+                    : "text-secondary-main"
+                }`}
             >
               {app.status}
             </Text>

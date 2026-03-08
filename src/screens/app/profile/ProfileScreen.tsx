@@ -1,13 +1,51 @@
+import { appService } from "@/src/services/appApi/appService";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 
 const ProfileScreen = () => {
   const router = useRouter();
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserProfile();
+    }, [])
+  );
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await appService.getUserProfile();
+      if (response.data.success) {
+        setUserProfile(response.data.data);
+      }
+    } catch (error) {
+      console.log("Error fetching profile:", error);
+    }
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return "";
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 1);
+  };
+
+  const capitalizeName = (name: string) => {
+    if (!name) return "";
+    return name
+      .split(' ')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-gray-white" edges={["top"]}>
       <View className="flex-1 w-full">
@@ -38,19 +76,28 @@ const ProfileScreen = () => {
                 </TouchableOpacity>
               </View>
               <View className="flex-row items-center mt-4 mb-4">
-                <Image
-                  source={{ uri: "https://i.pravatar.cc/150?img=47" }}
-                  className="w-16 h-16 rounded-full border-2 border-gray-white"
-                />
+                {userProfile?.profileImage?.url ? (
+                  <Image
+                    source={{ uri: userProfile.profileImage.url }}
+                    className="w-16 h-16 rounded-full border-2 border-gray-white"
+                  />
+                ) : (
+                  <View className="w-16 h-16 rounded-full bg-primary-light1 items-center justify-center border-2 border-gray-white">
+                    <Text className="text-h3 font-bold text-primary-main">
+                      {getInitials(userProfile?.fullName || "")}
+                    </Text>
+                  </View>
+                )}
+
                 <View className="ml-4">
                   <Text className="text-gray-white font-semibold text-h3">
-                    Sarah Jenkins
+                    {capitalizeName(userProfile?.fullName) || "Guest User"}
                   </Text>
                   <Text className="text-primary-light2 text-body2 font-semibold">
-                    Registered Nurse (RN)
+                    {userProfile?.role || "User"}
                   </Text>
                   <Text className="text-primary-light3 text-caption font-medium">
-                    Seattle, WA
+                    {userProfile?.city ? `${userProfile.city}, ${userProfile?.state || ""}` : ""}
                   </Text>
                 </View>
               </View>

@@ -84,6 +84,15 @@ export const appService = {
             'Content-Type': 'multipart/form-data',
         },
     }),
+
+    // Jobs Methods
+    getJobs: () => apiClient.get(APP_ENDPOINTS.JOBS),
+    getJobDetails: (id: string) => apiClient.get(`${APP_ENDPOINTS.JOBS}/${id}`),
+
+    // Applicant Methods
+    getApplicantJobs: (type: 'save' | 'apply') => apiClient.get(`${APP_ENDPOINTS.APPLICANT}/?type=${type}`),
+    saveJob: (data: { jobId: string }) => apiClient.post(`${APP_ENDPOINTS.APPLICANT}/save`, data),
+    applyJob: (data: { jobId: string, status: string }) => apiClient.post(APP_ENDPOINTS.APPLY, data),
 };
 
 export default {

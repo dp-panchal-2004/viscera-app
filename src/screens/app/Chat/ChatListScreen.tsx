@@ -1,6 +1,8 @@
+import chatService from "@/src/services/chatService";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Text,
@@ -9,101 +11,34 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const chats = [
-  {
-    id: "1",
-    name: "Jennifer (Recruiter)",
-    lastMessage: "Hi Sarah, are you available for a call?",
-    time: "10:42 AM",
-    avatar: "https://i.pravatar.cc/150?img=3",
-    online: true,
-  },
-  {
-    id: "2",
-    name: "Michael Johnson",
-    lastMessage: "Please share your updated resume.",
-    time: "09:15 AM",
-    avatar: "https://i.pravatar.cc/150?img=5",
-    online: false,
-  },
-   {
-    id: "3",
-    name: "Emily Watson",
-    lastMessage: "Thanks for attending the interview!",
-    time: "09:15 AM",
-    avatar: "https://i.pravatar.cc/150?img=8",
-    online: true,
-  },
-   {
-    id: "4",
-    name: "David Miller",
-    lastMessage: "Can we reschedule our meeting?",
-    time: "09:15 AM",
-    avatar: "https://i.pravatar.cc/150?img=12",
-    online: false,
-  },
-    {
-    id: "5",
-    name: "Sophia Brown",
-    lastMessage: "Your assignment looks good 👍",
-    time: "09:15 AM",
-    avatar: "https://i.pravatar.cc/150?img=16",
-    online: true,
-  },
-  {
-    id: "6",
-    name: "HR Team",
-    lastMessage: "Welcome aboard! 🎉",
-    time: "09:15 AM",
-    avatar: "https://i.pravatar.cc/150?img=20",
-    online: false,
-  },
-    {
-    id: "7",
-    name: "Alex Turner",
-    lastMessage: "Let me know once you’re free.",
-    time: "09:15 AM",
-    avatar: "https://i.pravatar.cc/150?img=25",
-    online: true,
-  },
-     {
-    id: "4",
-    name: "David Miller",
-    lastMessage: "Can we reschedule our meeting?",
-    time: "09:15 AM",
-    avatar: "https://i.pravatar.cc/150?img=12",
-    online: false,
-  },
-    {
-    id: "5",
-    name: "Sophia Brown",
-    lastMessage: "Your assignment looks good 👍",
-    time: "09:15 AM",
-    avatar: "https://i.pravatar.cc/150?img=16",
-    online: true,
-  },
-  {
-    id: "6",
-    name: "HR Team",
-    lastMessage: "Welcome aboard! 🎉",
-    time: "09:15 AM",
-    avatar: "https://i.pravatar.cc/150?img=20",
-    online: false,
-  },
-    {
-    id: "7",
-    name: "Alex Turner",
-    lastMessage: "Let me know once you’re free.",
-    time: "09:15 AM",
-    avatar: "https://i.pravatar.cc/150?img=25",
-    online: true,
-  },
-    
-
-];
-
 const ChatListScreen = () => {
   const router = useRouter();
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchConversations();
+  }, []);
+
+  const fetchConversations = async () => {
+    try {
+      const response = await chatService.getConversations();
+      // Assuming response format: { success: true, data: [...] }
+      setConversations(response.data || []);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center">
+        <ActivityIndicator size="large" color="#000" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-gray-white">
@@ -114,48 +49,54 @@ const ChatListScreen = () => {
       </View>
 
       <FlatList
-        data={chats}
-       keyExtractor={(item, index) => index.toString()}
-
+        data={conversations}
+        keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+        ListEmptyComponent={
+          <View className="flex-1 justify-center items-center p-10">
+            <Text className="text-text-secondary">No conversations yet.</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <TouchableOpacity
             onPress={() =>
               router.push({
                 pathname: "/app/ChatRoom",
-                params: { name: item.name, avatar: item.avatar},
+                params: {
+                  conversationId: item.conversationId || item.id,
+                  name: item.recipientName || "Chat",
+                  avatar: item.recipientAvatar || "https://i.pravatar.cc/150",
+                },
               })
             }
             className="flex-row items-center px-4 py-3 border-b border-gray-light"
           >
             <View className="relative mr-3">
               <Image
-                source={{ uri: item.avatar }}
+                source={{ uri: item.recipientAvatar || "https://i.pravatar.cc/150" }}
                 className="w-12 h-12 rounded-full"
               />
-              {item.online && (
+              {item.isOnline && (
                 <View className="absolute bottom-0 right-0 w-3 h-3 bg-action-green rounded-full border-2 border-white" />
               )}
             </View>
 
             <View className="flex-1  ">
               <View className="flex-1 justify-between flex-row items-center">
- <Text className="text-body1 font-semibold text-text-primary">
-                {item.name}
-              </Text>
-               <Text className="text-caption text-primary-main  font-semibold">
-              {item.time}
-            </Text>
+                <Text className="text-body1 font-semibold text-text-primary">
+                  {item.recipientName || "Recruiter"}
+                </Text>
+                <Text className="text-caption text-primary-main  font-semibold">
+                  {item.lastMessageTime || ""}
+                </Text>
               </View>
-             
+
               <Text
                 className="text-caption text-text-secondary"
                 numberOfLines={1}
               >
-                {item.lastMessage}
+                {item.lastMessage || "No messages yet"}
               </Text>
             </View>
-
-           
           </TouchableOpacity>
         )}
       />

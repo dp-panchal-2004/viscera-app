@@ -12,4 +12,7 @@ export const APP_ENDPOINTS = {
     DOCUMENTS: '/api/v1/nurses/documents',
     TRAVEL: '/api/v1/nurses/travel',
     PROFILE_PICTURE: '/api/v1/users/profile-picture',
+    JOBS: '/api/v1/jobs',
+    APPLICANT: '/api/v1/applicant',
+    APPLY: '/api/v1/applicant/apply',
 };

@@ -1,16 +1,19 @@
+import { appService } from "@/src/services/appApi/appService";
+import { RootState } from "@/src/store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   ScrollView,
   Text,
   TouchableOpacity,
   View
 } from "react-native";
+import { PieChart } from "react-native-gifted-charts";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
 import { MyApplications } from "./MyApplications";
-import { RecommendedJobs } from "./RecommendedJobs";
 
 const StatCard = ({
   icon,
@@ -19,7 +22,7 @@ const StatCard = ({
   bgColor,
   iconColor,
   onPress
-  
+
 }: {
   icon: any;
   title: string;
@@ -30,7 +33,7 @@ const StatCard = ({
 
 }) => {
   return (
-    <TouchableOpacity  onPress={onPress} className="basis-[30%] bg-white rounded-xl py-4 items-center border border-gray-light/50 mb-4 shadow-sm">
+    <TouchableOpacity onPress={onPress} className="basis-[30%] bg-white rounded-xl py-4 items-center border border-gray-light/50 mb-4 shadow-sm">
       <View
         className={`w-12 h-12 rounded-xl items-center justify-center mb-3 ${bgColor}`}
         style={{ backgroundColor: bgColor }}
@@ -46,9 +49,94 @@ const StatCard = ({
   );
 };
 
+const LegendItem = ({ color, label }: { color: string; label: string }) => (
+  <View className="flex-row items-center mb-2">
+    <View className="w-3 h-3 rounded-[3px] mr-2" style={{ backgroundColor: color }} />
+    <Text className="text-text-primary font-medium text-caption">{label}</Text>
+  </View>
+);
+
 const DashboardScreen = () => {
-    const router = useRouter();
-  
+  const router = useRouter();
+  const { accessToken } = useSelector((state: RootState) => state.auth);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [greeting, setGreeting] = useState("Good Morning");
+  const [completionScore, setCompletionScore] = useState<any>(null);
+  const [totalCompletion, setTotalCompletion] = useState(0);
+  const [savedCount, setSavedCount] = useState(0);
+  const [appliedCount, setAppliedCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (accessToken) {
+        fetchUserProfile();
+        fetchCompletionScore();
+        fetchJobCounts();
+      }
+      updateGreeting();
+    }, [accessToken])
+  );
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await appService.getUserProfile();
+      if (response.data.success) {
+        setUserProfile(response.data.data);
+      }
+    } catch (error) {
+      console.log("Error fetching profile on dashboard:", error);
+    }
+  };
+
+  const fetchCompletionScore = async () => {
+    try {
+      const response = await appService.getCompletionScore();
+      if (response.data.success) {
+        const data = response.data.data;
+        setCompletionScore(data);
+        const total = Object.values(data).reduce((acc: number, val: any) => acc + (typeof val === 'number' ? val : 0), 0);
+        setTotalCompletion(total);
+      }
+    } catch (error) {
+      console.log("Error fetching completion score:", error);
+    }
+  };
+
+  const fetchJobCounts = async () => {
+    try {
+      const [savedRes, appliedRes] = await Promise.all([
+        appService.getApplicantJobs('save'),
+        appService.getApplicantJobs('apply')
+      ]);
+
+      if (savedRes.data) {
+        const count = Object.keys(savedRes.data).filter(k => !isNaN(Number(k))).length;
+        setSavedCount(count);
+      }
+      if (appliedRes.data) {
+        const count = Object.keys(appliedRes.data).filter(k => !isNaN(Number(k))).length;
+        setAppliedCount(count);
+      }
+    } catch (error) {
+      console.log("Error fetching job counts:", error);
+    }
+  };
+
+  const updateGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting("Good Morning");
+    else if (hour < 18) setGreeting("Good Afternoon");
+    else setGreeting("Good Evening");
+  };
+
+  const capitalizeName = (name: string) => {
+    if (!name) return "";
+    return name
+      .split(' ')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-gray-white" edges={["top"]}>
       <View className="flex-1">
@@ -63,10 +151,10 @@ const DashboardScreen = () => {
               <View className="flex-row justify-between items-start mb-5   w-full ">
                 <View className="gap-0.5">
                   <Text className="text-white/90 text-h5 font-normal">
-                    Good Morning,
+                    {greeting},
                   </Text>
                   <Text className="text-white text-[24px] font-bold ">
-                    Sarah Jenkins
+                    {capitalizeName(userProfile?.fullName) || "Guest User"}
                   </Text>
                 </View>
                 <TouchableOpacity className="bg-white/20 p-3 rounded-xl relative" onPress={() => {
@@ -81,30 +169,6 @@ const DashboardScreen = () => {
                 </TouchableOpacity>
               </View>
 
-              <View className="bg-white/20 backdrop-blur-lg p-5 rounded-xl mt-2 relative z-20">
-                <View className="flex-row justify-between items-start mb-1.5">
-                  <Text className="text-white text-h2 font-bold flex-1">
-                    Complete Your Profile
-                  </Text>
-                  <View className="bg-white/30 px-4 py-1 rounded-md ">
-                    <Text className="text-white font-bold text-small">65%</Text>
-                  </View>
-                </View>
-                <Text className="text-white/95 text-h6 mb-3">
-                  Boost visibility by 80%
-                </Text>
-
-                {/* Progress Bar */}
-                <View className="h-2 bg-white/30 rounded-full mb-4">
-                  <View className="h-full bg-white rounded-full w-[65%]" />
-                </View>
-
-                <TouchableOpacity onPress={() => router.push('/app/(tabs)/profile')} className="bg-white py-3 rounded-xl items-center">
-                  <Text className="text-primary-main font-bold text-h3">
-                    Update Profile
-                  </Text>
-                </TouchableOpacity>
-              </View>
             </View>
           </LinearGradient>
         </View>
@@ -117,23 +181,83 @@ const DashboardScreen = () => {
             flexGrow: 1,
           }}
         >
+          {/* Profile Completeness Card */}
+          <View className="bg-white p-5 rounded-2xl mb-6 shadow-sm border border-gray-light/30">
+            <Text className="text-text-primary text-h4 font-bold mb-4">
+              Profile Completeness
+            </Text>
+
+            <View className="flex-row items-center justify-between">
+              <View className="items-center">
+                <PieChart
+                  donut
+                  radius={60}
+                  innerRadius={30}
+                  showText
+                  textColor="white"
+                  textSize={10}
+                  fontWeight="bold"
+                  data={[
+                    { value: completionScore?.genralInfoPercentage || 0, color: '#3A86FF', text: `${completionScore?.genralInfoPercentage || 0}%` },
+                    { value: completionScore?.experiencePercentage || 0, color: '#4CAF50', text: `${completionScore?.experiencePercentage || 0}%` },
+                    { value: completionScore?.skillsPercentage || 0, color: '#FF9800', text: `${completionScore?.skillsPercentage || 0}%` },
+                    { value: completionScore?.licensePercentage || 0, color: '#9C27B0', text: `${completionScore?.licensePercentage || 0}%` },
+                    { value: completionScore?.documentPercentage || 0, color: '#3F51B5', text: `${completionScore?.documentPercentage || 0}%` },
+                    { value: completionScore?.resumePercentage || 0, color: '#F44336', text: `${completionScore?.resumePercentage || 0}%` },
+                    { value: Math.max(0, 100 - totalCompletion), color: '#F2F2F2' }
+                  ]}
+                />
+              </View>
+
+              <View className="flex-1 ml-6">
+                <LegendItem color="#3A86FF" label="General Info" />
+                <LegendItem color="#4CAF50" label="Experience" />
+                <LegendItem color="#FF9800" label="Skills" />
+                <LegendItem color="#9C27B0" label="Licenses" />
+                <LegendItem color="#3F51B5" label="Documents" />
+                <LegendItem color="#F44336" label="Resume" />
+              </View>
+            </View>
+
+            <View className="mt-4 items-center">
+              <Text className="text-text-primary font-bold text-h4">
+                {totalCompletion}% Complete
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => router.push('/app/(tabs)/profile')}
+              className="mt-4 border border-primary-main py-3 rounded-xl items-center"
+            >
+              <Text className="text-primary-main font-bold text-body1">
+                Update Profile
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <View className="flex-row flex-wrap justify-between  w-full">
             <StatCard
               icon="bookmark"
               title="Saved"
-              value="12 jobs"
+              value={`${savedCount} jobs`}
               bgColor="#EAF2FF"
               iconColor="#2563EB"
-              onPress={() => router.push("/app/(tabs)/jobs")}
+              onPress={() => router.push({
+                pathname: "/app/(tabs)/jobs",
+                params: { tab: 'saved' }
+              })}
             />
 
             <StatCard
               icon="document-text"
               title="Applied"
-              value="8 jobs"
+              value={`${appliedCount} jobs`}
               bgColor="#F3ECFF"
               iconColor="#7C3AED"
-              onPress={() => router.push("/app/(tabs)/jobs")}
+              onPress={() => router.push({
+                pathname: "/app/(tabs)/jobs",
+                params: { tab: 'applied' }
+              })}
             />
 
             <StatCard
@@ -144,40 +268,17 @@ const DashboardScreen = () => {
               iconColor="#F97316"
               onPress={() => router.push("/app/(tabs)/chat")}
             />
-
-            <StatCard
-              icon="eye"
-              title="Viewed Profile"
-              value="12 new"
-              bgColor="#E6F7FF"
-              iconColor="#0EA5E9"
-            />
-
-            <StatCard
-              icon="briefcase"
-              title="Job Requests"
-              value="2 pending"
-              bgColor="#FEF3C7"
-              iconColor="#F59E0B"
-            />
-            <StatCard
-              icon="notifications"
-              title="Alerts"
-              value="3 new"
-              bgColor="#E0F2FE"
-              iconColor="#0284C7"
-            />
           </View>
           <View >
 
-         
-       
-        <MyApplications />
-           </View>
-           <View>
+
+
+            <MyApplications />
+          </View>
+          {/* <View>
             <RecommendedJobs />
-           </View>
-             
+          </View> */}
+
         </ScrollView>
       </View>
     </SafeAreaView>
